@@ -34,12 +34,6 @@ class Reporter:
 			outFile.write('\n')
 			outFile.close()
 
-			print(str(self.numIterations) + self.delimiter)
-			print(str("{:10.2f}".format(start - self.startTime - self.writingTime)) + self.delimiter)
-			print(str("{:10.2f}".format(meanObjective)) + self.delimiter)
-			print(str("{:10.2f}".format(bestObjective)) + self.delimiter)
-			print('\n')
-
 			self.numIterations += 1
 			self.writingTime += time.time() - start
 		return (self.allowedTime + self.writingTime) - (time.time() - self.startTime)

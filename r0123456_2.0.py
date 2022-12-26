@@ -3,7 +3,7 @@ import random
 import time
 import Reporter
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 class TSP:
     def __init__(self, matrix):
@@ -39,7 +39,7 @@ class TSP:
                 if self.distanceMatrix[i][j] == 0:
                     continue
                 elif self.distanceMatrix[i][j] == math.inf:
-                    possibilityMatrix[i][j] = np.exp(-1 * self.largestPath / 100) / 10
+                    possibilityMatrix[i][j] = np.exp(-1 * self.largestPath / 100) / 5
                     # possibilityMatrix[i][j] = 1 / self.penalty
                 else:
                     possibilityMatrix[i][j] = np.exp(-1 * self.distanceMatrix[i][j] / 100)
@@ -57,6 +57,7 @@ class Individual:
         self.maxValue = maxValue
         self.penaltyOrder = 1.02
         self.fitnessValue, self.absoluteFitnessValue = self.fitness()
+        self.adjacency = self.getAdjacencyRepresentation()
 
     def getAdjacencyRepresentation(self):
         adjacencyList = np.zeros(self.tsp.getLength(), dtype=int)
@@ -77,20 +78,13 @@ class Individual:
             absoluteDistance += self.tsp.distanceMatrix[self.order[i]][self.order[i + 1]]
         return distance, absoluteDistance
 
-    def mutate(self):
-        point1 = random.randint(0, self.tsp.getLength() - 1)
-        point2 = random.randint(0, self.tsp.getLength() - 1)
-        for i in range(1):
-            self.order[[(point1 + i) // self.tsp.getLength(), (point2 + i) // self.tsp.getLength()]] = \
-                self.order[[(point2 + i) // self.tsp.getLength(), (point1 + i) // self.tsp.getLength()]]
-
     def swapMutation(self):
-
-        points = random.sample(range(0, self.tsp.getLength() - 1), 2)
+        points = random.sample(range(0, self.tsp.getLength()), 2)
 
         self.order[points[0]], self.order[points[1]] = self.order[points[1]], self.order[points[0]]
 
         self.fitnessValue, self.absoluteFitnessValue = self.fitness()
+        self.adjacency = self.getAdjacencyRepresentation()
 
     def replaceOrder(self, newOrder, newFitness=-1):
         self.order = newOrder.copy()
@@ -98,6 +92,16 @@ class Individual:
             self.fitnessValue = newFitness
         else:
             self.fitnessValue, self.absoluteFitnessValue = self.fitness()
+            self.adjacency = self.getAdjacencyRepresentation()
+
+    def findLongestPath(self):
+        minLength = math.inf
+        minIndex = 0
+        for i in range(-1, self.tsp.getLength() - 1, 1):
+            if self.tsp.distanceMatrix[self.order[i]][self.order[i + 1]] < minLength:
+                minIndex = i
+                minLength = self.tsp.distanceMatrix[self.order[i]][self.order[i + 1]]
+        return minIndex
 
 
 class EvolutionaryAlgorithm:
@@ -118,7 +122,9 @@ class EvolutionaryAlgorithm:
         self.maxValue = maxValue
         self.initiatePopulation()
         self.bestSolution = None
-
+        self.islandPopulation = None
+        self.islandOffspring = []
+        self.islandSize = 0
 
     def initiatePopulation(self):
         for times in range(self.populationSize):
@@ -152,8 +158,15 @@ class EvolutionaryAlgorithm:
         self.population = np.append(self.population, [self.offspringPopulation])
 
 
-    def partiallyMappedCrossoverRecombination(self):
-        p1, p2 = self.sharedSelection()
+    def partiallyMappedCrossoverRecombination(self, mode=0):
+        p1 = p2 = 0
+        if mode == 0:
+            p1, p2 = self.sharedSelection()
+        else:
+            players = list(np.random.choice(self.population, size=self.tournament_k))
+            players.sort(key=lambda p: p.fitnessValue)
+            p1 = players[0]
+            p2 = players[1]
         points = random.sample(range(0, self.tspLength - 1), 2)
         points.sort()
         if p1 == p2:
@@ -204,7 +217,9 @@ class EvolutionaryAlgorithm:
 
     # order crossover operator
     def orderCrossoverOperator(self):
-        p1, p2 = self.selectTwoParents()
+        players = list(np.random.choice(self.islandPopulation, size=2))
+        p1 = players[0]
+        p2 = players[1]
         points = random.sample(range(0, self.tspLength), 2)
         left = 0
         right = 0
@@ -246,6 +261,7 @@ class EvolutionaryAlgorithm:
         return p1, p2
 
     def mutate(self):
+
         for i in self.population:
             if i == self.bestSolution:
                 continue
@@ -255,28 +271,60 @@ class EvolutionaryAlgorithm:
 
     def eliminate(self, iteration):
 
-        alpha = 0.99
-        s = alpha ** iteration
-        a = math.log(s)
-        l = []
-        for i in range(len(self.population)):
-            l.append(math.exp(a * i))
-        probabilitySum = sum(l)
+        # alpha = 0.99
+        # s = alpha ** iteration
+        # a = math.log(s)
 
-        p = list(self.population)
-        p.sort(key=lambda p: p.fitnessValue)
-        newPop = []
-        num = 0
-        while len(newPop) < self.populationSize:
-            for i in range(len(p)):
-                possibility = np.random.random() * probabilitySum
-                if possibility < l[i]:
-                    num += 1
-                    newPop.append(p[i])
-                    if num >= self.populationSize:
-                        break
+        # s = 0.01
+        # a = (1 - s) / ((300 - 1) ** 2)
+        #
+        # l = []
+        # for i in range(len(self.population)):
+        #     l.append(a * (i - 300)**2 + s)
+        # probabilitySum = sum(l)
+        #
+        # p = list(self.population)
+        # p.sort(key=lambda p: p.fitnessValue)
+        # newPop = []
+        # num = 0
+        # while len(newPop) < self.populationSize:
+        #     for i in range(len(p)):
+        #         possibility = np.random.random() * 1.5
+        #         if possibility < l[i]:
+        #             num += 1
+        #             newPop.append(p[i])
+        #             if num >= self.populationSize:
+        #                 break
+        #
+        # self.population = np.array(newPop)
+        pop = list(self.population)
+        pop.sort(key=lambda p: p.fitnessValue)
+        topK = 5
+        newPop = pop[:topK]
+        for w in range(topK):
+            for m, p in enumerate(self.population):
+                if p == newPop[w]:
+                    self.population = np.delete(self.population, m)
+                    break
+
+        for j in range(self.populationSize - topK):
+            players = np.random.choice(self.population, size=self.tournament_k)
+            minFitness = math.inf
+            minIndex = 0
+            for i, p in enumerate(players):
+                fitnessValue = self.sharedFitness(p, players)
+                if fitnessValue < minFitness:
+                    minFitness = fitnessValue
+                    minIndex = i
+            newPop.append(players[minIndex])
+
+            for m, p in enumerate(self.population):
+                if p == players[minIndex]:
+                    self.population = np.delete(self.population, m)
+                    break
 
         self.population = np.array(newPop)
+
 
     def getMeanFitness(self):
         return np.mean([i.fitnessValue for i in self.population])
@@ -305,8 +353,8 @@ class EvolutionaryAlgorithm:
         print("And it has ", infNums, " infinite values.")
 
     def getSimilarityOfTwoIndividuals(self, i1: Individual, i2: Individual):
-        adjacencyList1 = i1.getAdjacencyRepresentation()
-        adjacencyList2 = i2.getAdjacencyRepresentation()
+        adjacencyList1 = i1.adjacency
+        adjacencyList2 = i2.adjacency
         count = 0
         for i in range(self.tspLength):
             if adjacencyList1[i] == adjacencyList2[i]:
@@ -360,6 +408,7 @@ class EvolutionaryAlgorithm:
     def getTopKIndividuals(self, topK=1):
         p = list(self.population)
         p.sort(key=lambda p: p.fitnessValue)
+        unchangedPop = p[topK:]
         p = p[:topK]
         for i in range(len(p)):
             subGroup = []
@@ -374,25 +423,216 @@ class EvolutionaryAlgorithm:
 
             if sum(p[i].order) != self.tspLength * (self.tspLength - 1) / 2:
                 print("Mutate Sum error")
+        self.population = np.append(p, unchangedPop)
 
-    def __call__(self, iteration):
-        ts1 = time.time()
-        self.createOffsprings()
-        ts2 = time.time()
-        self.mutate()
-        ts3 = time.time()
-        self.getTopKIndividuals(5)
-        ts4 = time.time()
-        self.eliminate(iteration)
-        ts5 = time.time()
-        mean, bestFitness, bestIndividual = self.getBestFitness()
-        ts6 = time.time()
-        print("Creating Offspring needs time: ", ts2 - ts1)
-        print("Mutation needs time: ", ts3 - ts2)
-        print("getTopKIndividuals needs time: ", ts4 - ts3)
-        print("Elimination needs time: ", ts5 - ts4)
-        print("getBestFitness needs time: ", ts6 - ts5)
-        return mean, bestFitness, bestIndividual.order
+
+    def getPopulationSimilarityData(self):
+        tss1 = time.time()
+        temp = []
+        temp1 = []
+        for i in range(len(self.population)):
+            p = self.population[i]
+            tempScore = []
+            for j in range(len(self.population)):
+                if i == j:
+                    continue
+                nextP = self.population[j]
+                similarity = self.getSimilarityOfTwoIndividuals(p, nextP)
+                tempScore = np.append(tempScore, [similarity])
+            count = 0
+            count1 = 0
+            for m in range(len(tempScore)):
+                if tempScore[m] == 1:
+                    count += 1
+                if tempScore[m] >= 0.75:
+                    count1 += 1
+            temp = np.append(temp, [count])
+            temp1 = np.append(temp1, [count1])
+        filename = "Similarity.csv"
+        delimiter = ','
+        outFile = open(filename, "w")
+        for i in range(len(temp)):
+            outFile.write(str(temp[i]) + delimiter)
+        outFile.write('\n')
+        for i in range(len(temp)):
+            outFile.write(str(temp1[i]) + delimiter)
+        outFile.close()
+        tss2 = time.time()
+        print("Calculate 200 Individuals similarity needs time: ", tss2 - tss1)
+
+    def deleteDuplicateIndividuals(self):
+        newPop = []
+        for i in range(len(self.population)):
+            hasSame = False
+            for j in range(len(newPop)):
+                if (self.population[i].adjacency == newPop[j].adjacency).all():
+                    hasSame = True
+                    break
+            if not hasSame:
+                newPop = np.append(newPop,[self.population[i]])
+
+        self.population = newPop
+        print("New population has ", len(self.population)," individuals")
+
+    def getOneIsland(self,islandThreshold=0.75):
+        print("Before pruned population size: ", len(self.population))
+        temp1 = []
+        maxSimilarity = 0
+        for i in range(len(self.population)):
+            p = self.population[i]
+            tempScore = []
+            for j in range(len(self.population)):
+                if i == j:
+                    continue
+                nextP = self.population[j]
+                similarity = self.getSimilarityOfTwoIndividuals(p, nextP)
+                maxSimilarity = max(maxSimilarity, similarity)
+                tempScore = np.append(tempScore, [similarity])
+            count1 = 0
+            for m in range(len(tempScore)):
+                if tempScore[m] >= islandThreshold:
+                    count1 += 1
+            temp1 = np.append(temp1, [count1])
+        maxSameIndex = 0
+        maxSameNumber = max(temp1)
+        for i in range(len(temp1)):
+            if temp1[i] == maxSameNumber:
+                maxSameIndex = i
+                break
+        self.islandPopulation = []
+        indexes = []
+        for n in range(len(self.population)):
+            if self.getSimilarityOfTwoIndividuals(self.population[maxSameIndex], self.population[n]) >= islandThreshold:
+                self.islandPopulation = np.append(self.islandPopulation, [self.population[n]])
+                indexes = np.append(indexes, [n])
+        for i in range(len(self.islandPopulation)):
+            self.population = np.delete(self.population, i)
+
+        self.islandSize = len(self.islandPopulation)
+        self.populationSize = len(self.population)
+        print("Island population size: ", len(self.islandPopulation))
+        print("After pruned population size: ", len(self.population))
+
+    def parallelCreatingOffspring(self):
+        self.offspringPopulation = []
+        for i in range(len(self.population)//2):
+            if random.random() < self.recombineProbability:
+                o1, o2 = self.partiallyMappedCrossoverRecombination(1)
+                self.offspringPopulation = np.append(self.offspringPopulation, [o1])
+                self.offspringPopulation = np.append(self.offspringPopulation, [o2])
+        self.population = np.append(self.population, [self.offspringPopulation])
+
+        self.offspringPopulation = []
+        for i in range(len(self.islandPopulation)//2):
+            if random.random() < self.recombineProbability:
+                o1, o2 = self.orderCrossoverOperator()
+                self.offspringPopulation = np.append(self.offspringPopulation, [o1])
+                self.offspringPopulation = np.append(self.offspringPopulation, [o2])
+        self.islandPopulation = np.append(self.islandPopulation, [self.offspringPopulation])
+
+    def parallelMutate(self):
+        l1 = list(self.population)
+        bestIndividual1 = min(l1, key=lambda p: p.fitnessValue)
+        for i in self.population:
+            if i == bestIndividual1:
+                continue
+            if random.random() < self.mutationProbability * 5:
+                i.swapMutation()
+
+        l2 = list(self.islandPopulation)
+        bestIndividual2 = min(l2, key=lambda p: p.fitnessValue)
+        for i in self.islandPopulation:
+            if i == bestIndividual2:
+                continue
+            if random.random() < self.mutationProbability * 5:
+                i.swapMutation()
+
+    def parallelEliminate(self):
+        p = list(self.population)
+        p.sort(key=lambda individual: individual.fitnessValue)
+        p = p[:self.populationSize]
+        self.population = np.array(p)
+
+        i = list(self.islandPopulation)
+        i.sort(key=lambda individual: individual.fitnessValue)
+        i = i[:self.islandSize]
+        self.islandPopulation = np.array(i)
+
+    def islandLocalSearch(self, topK=5):
+        island = list(self.islandPopulation)
+        island.sort(key=lambda p: p.fitnessValue)
+        islandLeft = island[topK:]
+        island = island[:topK]
+        localSearchTime = self.tspLength // 10
+        j = 0
+        for individual in island:
+            index = individual.findLongestPath()
+            numList = [k for k in range(0, self.tspLength)]
+            localSearch = random.sample(numList, localSearchTime)
+            subGroup = [individual]
+            for i in range(localSearchTime):
+                order = individual.order.copy()
+                order[index], order[localSearch[i]] = order[localSearch[i]], order[index]
+                newIndividual = Individual(self.tsp, self.penalty, self.maxValue, order)
+                subGroup = np.append(subGroup, [newIndividual])
+            island[j] = min(subGroup, key=lambda p: p.fitnessValue)
+            j += 1
+
+        self.islandPopulation = np.append(island, islandLeft)
+
+
+    def parallelLocalSearch(self):
+        self.getTopKIndividuals(self.tournament_k)
+
+        self.islandLocalSearch(self.tournament_k)
+
+    def parallelGetBestFitness(self):
+        bestFitness = self.population[0].fitnessValue
+        bestIndividual = self.population[0]
+        totalFitness = 0
+        for i in self.population:
+            totalFitness += i.fitnessValue
+            if i.fitnessValue < bestFitness:
+                bestFitness = i.fitnessValue
+                bestIndividual = i
+        for i in self.islandPopulation:
+            totalFitness += i.fitnessValue
+            if i.fitnessValue < bestFitness:
+                bestFitness = i.fitnessValue
+                bestIndividual = i
+        avgFitness = totalFitness / (self.islandSize + self.populationSize)
+        return avgFitness, bestFitness, bestIndividual
+
+    def __call__(self, iteration, mode=0):
+        if mode == 0:
+            ts1 = time.time()
+            self.createOffsprings()
+            ts2 = time.time()
+            print("Creating Offspring needs time: ", ts2 - ts1)
+            self.mutate()
+            ts3 = time.time()
+            print("Mutation needs time: ", ts3 - ts2)
+            self.getTopKIndividuals(5)
+            ts4 = time.time()
+            print("getTopKIndividuals needs time: ", ts4 - ts3)
+            self.eliminate(iteration)
+            ts5 = time.time()
+            print("Elimination needs time: ", ts5 - ts4)
+            mean, bestFitness, bestIndividual = self.getBestFitness()
+            ts6 = time.time()
+            print("getBestFitness needs time: ", ts6 - ts5)
+
+            return mean, bestFitness, bestIndividual.order
+        if mode == 1:
+            # local search model
+            self.parallelCreatingOffspring()
+            self.parallelMutate()
+            self.parallelLocalSearch()
+            self.parallelEliminate()
+            mean, bestFitness, bestIndividual = self.parallelGetBestFitness()
+            return mean, bestFitness, bestIndividual.order
+
+
 
 
 # Modify the class name to match your student number.
@@ -416,10 +656,33 @@ class r0776947:
 
         # Your code here.
         yourConvergenceTestsHere = True
-        while iterationTimes < 500:
-            iterationTimes += 1
+        # mode == 0 means using diversity selection and elimination method
+        # mode == 1 means using local search
+        mode = 0
+        once = 0
+        convergency = False
+        convergentCount = 0
+        while iterationTimes < 1000 and not convergency:
+            meanObjective, bestObjective, bestSolution = algorithm(iterationTimes, mode)
+            print(str(iterationTimes))
+            print(str("{:10.2f}".format(meanObjective)))
+            print(str("{:10.2f}".format(bestObjective)))
+            print('\n')
 
-            meanObjective, bestObjective, bestSolution = algorithm(iterationTimes)
+            if meanObjective < bestObjective * 3 and iterationTimes >= 5 and once == 0:
+                once = 1
+                mode = 1
+                algorithm.deleteDuplicateIndividuals()
+                algorithm.getPopulationSimilarityData()
+                algorithm.getOneIsland()
+
+            if mode == 1 and meanObjective < bestObjective * 1.15:
+                convergentCount += 1
+            else:
+                convergentCount = 0
+
+            if convergentCount >= 15:
+                convergency = True
             counts = 0
             ts1 = time.time()
             for i in range(-1, tsp.getLength() - 1, 1):
@@ -439,12 +702,14 @@ class r0776947:
             ts3 = time.time()
             print("Time left: ", timeLeft)
             print("Report needs time: ", ts3 - ts2)
-
+            iterationTimes += 1
+            if timeLeft < 0:
+                break
         # Your code here.
         return 0
 
 
 if __name__ == '__main__':
     r = r0776947()
-    r.optimize("tour1000.csv")
+    r.optimize("tour100.csv")
 
