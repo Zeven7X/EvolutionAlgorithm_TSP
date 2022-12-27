@@ -5,6 +5,7 @@ import Reporter
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 class TSP:
     def __init__(self, matrix):
         self.distanceMatrix = matrix
@@ -39,12 +40,12 @@ class TSP:
                 if self.distanceMatrix[i][j] == 0:
                     continue
                 elif self.distanceMatrix[i][j] == math.inf:
-                    possibilityMatrix[i][j] = np.exp(-1 * self.largestPath / 100) / 5
+                    possibilityMatrix[i][j] = np.exp(-1 * self.largestPath / 9)
                     # possibilityMatrix[i][j] = 1 / self.penalty
                 else:
-                    possibilityMatrix[i][j] = np.exp(-1 * self.distanceMatrix[i][j] / 100)
+                    possibilityMatrix[i][j] = np.exp(-1 * self.distanceMatrix[i][j] / 9)
                     # possibilityMatrix[i][j] = 1 / self.distanceMatrix[i][j]\
-        # print(possibilityMatrix)
+        print(possibilityMatrix)
         return possibilityMatrix
 
 
@@ -56,7 +57,7 @@ class Individual:
         self.order = order
         self.maxValue = maxValue
         self.penaltyOrder = 1.02
-        self.fitnessValue, self.absoluteFitnessValue = self.fitness()
+        self.fitnessValue = self.fitness()
         self.adjacency = self.getAdjacencyRepresentation()
 
     def getAdjacencyRepresentation(self):
@@ -70,20 +71,18 @@ class Individual:
 
     def fitness(self):
         distance = 0
-        absoluteDistance = 0
         for i in range(-1, self.tsp.getLength() - 1, 1):
             distance += self.maxValue * (self.penalty ** self.penaltyOrder) \
                 if self.tsp.distanceMatrix[self.order[i]][self.order[i + 1]] == math.inf \
                 else self.tsp.distanceMatrix[self.order[i]][self.order[i + 1]]
-            absoluteDistance += self.tsp.distanceMatrix[self.order[i]][self.order[i + 1]]
-        return distance, absoluteDistance
+        return distance
 
     def swapMutation(self):
         points = random.sample(range(0, self.tsp.getLength()), 2)
 
         self.order[points[0]], self.order[points[1]] = self.order[points[1]], self.order[points[0]]
 
-        self.fitnessValue, self.absoluteFitnessValue = self.fitness()
+        self.fitnessValue = self.fitness()
         self.adjacency = self.getAdjacencyRepresentation()
 
     def replaceOrder(self, newOrder, newFitness=-1):
@@ -91,7 +90,7 @@ class Individual:
         if newFitness != -1:
             self.fitnessValue = newFitness
         else:
-            self.fitnessValue, self.absoluteFitnessValue = self.fitness()
+            self.fitnessValue = self.fitness()
             self.adjacency = self.getAdjacencyRepresentation()
 
     def findLongestPath(self):
@@ -102,6 +101,77 @@ class Individual:
                 minIndex = i
                 minLength = self.tsp.distanceMatrix[self.order[i]][self.order[i + 1]]
         return minIndex
+
+    def swapMutationUpdateInfo(self):
+        points = random.sample(range(0, self.tsp.getLength()), 2)
+        self.updateFitnessAndAdjacency(points)
+        self.updateOrder(points)
+
+    def updateOrder(self, points):
+        self.order[points[0]], self.order[points[1]] = self.order[points[1]], self.order[points[0]]
+
+    def updateFitnessAndAdjacency(self, points):
+        smallerPoint = min(points[0], points[1])
+        biggerPoint = max(points[0], points[1])
+        if abs(points[0] - points[1]) == 1:
+            p1 = self.order[smallerPoint - 1]
+            p2 = self.order[smallerPoint]
+            p3 = self.order[smallerPoint + 1]
+            p4 = self.order[smallerPoint + 2] if smallerPoint + 2 != self.tsp.length else self.order[0]
+            d1 = self.getAdaptedDistance(self.tsp.distanceMatrix[p1][p2])
+            d2 = self.getAdaptedDistance(self.tsp.distanceMatrix[p2][p3])
+            d3 = self.getAdaptedDistance(self.tsp.distanceMatrix[p3][p4])
+            newD1 = self.getAdaptedDistance(self.tsp.distanceMatrix[p1][p3])
+            newD2 = self.getAdaptedDistance(self.tsp.distanceMatrix[p3][p2])
+            newD3 = self.getAdaptedDistance(self.tsp.distanceMatrix[p2][p4])
+            self.fitnessValue += newD1 + newD2 + newD3 - d1 - d2 - d3
+            if abs(self.fitnessValue) == math.inf:
+                print("Problem occurs")
+            self.adjacency[p1] = p3
+            self.adjacency[p3] = p2
+            self.adjacency[p2] = p4
+        elif abs(points[0] - points[1]) == self.tsp.length - 1:
+            p1 = self.order[self.tsp.length - 2]
+            p2 = self.order[self.tsp.length - 1]
+            p3 = self.order[0]
+            p4 = self.order[1]
+            d1 = self.getAdaptedDistance(self.tsp.distanceMatrix[p1][p2])
+            d2 = self.getAdaptedDistance(self.tsp.distanceMatrix[p2][p3])
+            d3 = self.getAdaptedDistance(self.tsp.distanceMatrix[p3][p4])
+            newD1 = self.getAdaptedDistance(self.tsp.distanceMatrix[p1][p3])
+            newD2 = self.getAdaptedDistance(self.tsp.distanceMatrix[p3][p2])
+            newD3 = self.getAdaptedDistance(self.tsp.distanceMatrix[p2][p4])
+            self.fitnessValue += newD1 + newD2 + newD3 - d1 - d2 - d3
+            if abs(self.fitnessValue) == math.inf:
+                print("Problem occurs")
+            self.adjacency[p1] = p3
+            self.adjacency[p3] = p2
+            self.adjacency[p2] = p4
+        else:
+            p1 = self.order[smallerPoint - 1]
+            p2 = self.order[smallerPoint]
+            p3 = self.order[smallerPoint + 1]
+            p4 = self.order[biggerPoint - 1]
+            p5 = self.order[biggerPoint]
+            p6 = self.order[biggerPoint + 1] if biggerPoint + 1 != self.tsp.length else self.order[0]
+            d1 = self.getAdaptedDistance(self.tsp.distanceMatrix[p1][p2])
+            d2 = self.getAdaptedDistance(self.tsp.distanceMatrix[p2][p3])
+            d3 = self.getAdaptedDistance(self.tsp.distanceMatrix[p4][p5])
+            d4 = self.getAdaptedDistance(self.tsp.distanceMatrix[p5][p6])
+            newD1 = self.getAdaptedDistance(self.tsp.distanceMatrix[p1][p5])
+            newD2 = self.getAdaptedDistance(self.tsp.distanceMatrix[p5][p3])
+            newD3 = self.getAdaptedDistance(self.tsp.distanceMatrix[p4][p2])
+            newD4 = self.getAdaptedDistance(self.tsp.distanceMatrix[p2][p6])
+            self.fitnessValue += newD1 + newD2 + newD3 + newD4 - d1 - d2 - d3 - d4
+            if abs(self.fitnessValue) == math.inf:
+                print("Problem occurs")
+            self.adjacency[p1] = p5
+            self.adjacency[p5] = p3
+            self.adjacency[p4] = p2
+            self.adjacency[p2] = p6
+
+    def getAdaptedDistance(self, distance):
+        return distance if distance != math.inf else self.maxValue * (self.penalty ** self.penaltyOrder)
 
 
 class EvolutionaryAlgorithm:
@@ -156,7 +226,6 @@ class EvolutionaryAlgorithm:
                 self.offspringPopulation = np.append(self.offspringPopulation, [o1])
                 self.offspringPopulation = np.append(self.offspringPopulation, [o2])
         self.population = np.append(self.population, [self.offspringPopulation])
-
 
     def partiallyMappedCrossoverRecombination(self, mode=0):
         p1 = p2 = 0
@@ -267,7 +336,7 @@ class EvolutionaryAlgorithm:
                 continue
             if random.random() < self.mutationProbability:
                 # i.mutate()
-                i.swapMutation()
+                i.swapMutationUpdateInfo()
 
     def eliminate(self, iteration):
 
@@ -324,7 +393,6 @@ class EvolutionaryAlgorithm:
                     break
 
         self.population = np.array(newPop)
-
 
     def getMeanFitness(self):
         return np.mean([i.fitnessValue for i in self.population])
@@ -425,8 +493,8 @@ class EvolutionaryAlgorithm:
                 print("Mutate Sum error")
         self.population = np.append(p, unchangedPop)
 
-
     def getPopulationSimilarityData(self):
+
         tss1 = time.time()
         temp = []
         temp1 = []
@@ -462,6 +530,9 @@ class EvolutionaryAlgorithm:
 
     def deleteDuplicateIndividuals(self):
         newPop = []
+        p = list(self.population)
+        p.sort(key=lambda individual: individual.fitnessValue)
+        newPop = np.append(newPop, p[0])
         for i in range(len(self.population)):
             hasSame = False
             for j in range(len(newPop)):
@@ -469,13 +540,18 @@ class EvolutionaryAlgorithm:
                     hasSame = True
                     break
             if not hasSame:
-                newPop = np.append(newPop,[self.population[i]])
+                newPop = np.append(newPop, [self.population[i]])
 
         self.population = newPop
-        print("New population has ", len(self.population)," individuals")
+        print("New population has ", len(self.population), " individuals")
+        print("New population has best fitness ", newPop[0].fitnessValue)
 
-    def getOneIsland(self,islandThreshold=0.75):
+    def getOneIsland(self, islandThreshold=0.75):
         print("Before pruned population size: ", len(self.population))
+        l1 = list(self.population)
+        bestIndividual1 = min(l1, key=lambda p: p.fitnessValue)
+        print("bestIndividual1 has fitness ", bestIndividual1.fitnessValue)
+
         temp1 = []
         maxSimilarity = 0
         for i in range(len(self.population)):
@@ -505,47 +581,62 @@ class EvolutionaryAlgorithm:
             if self.getSimilarityOfTwoIndividuals(self.population[maxSameIndex], self.population[n]) >= islandThreshold:
                 self.islandPopulation = np.append(self.islandPopulation, [self.population[n]])
                 indexes = np.append(indexes, [n])
+        print(indexes)
+        minusCount = 0
         for i in range(len(self.islandPopulation)):
-            self.population = np.delete(self.population, i)
+            self.population = np.delete(self.population, int(indexes[i] - minusCount))
+            minusCount += 1
 
         self.islandSize = len(self.islandPopulation)
         self.populationSize = len(self.population)
         print("Island population size: ", len(self.islandPopulation))
         print("After pruned population size: ", len(self.population))
+        l1 = list(self.population)
+        bestIndividual1 = min(l1, key=lambda p: p.fitnessValue)
+        print("bestIndividual1 has fitness ", bestIndividual1.fitnessValue)
+        l2 = list(self.islandPopulation)
+        bestIndividual2 = min(l2, key=lambda p: p.fitnessValue)
+        print("bestIndividual1 has fitness ", bestIndividual2.fitnessValue)
 
     def parallelCreatingOffspring(self):
+        l1 = list(self.population)
+        bestIndividual1 = min(l1, key=lambda p: p.fitnessValue)
+        print("bestIndividual1 has fitness ", bestIndividual1.fitnessValue)
         self.offspringPopulation = []
-        for i in range(len(self.population)//2):
+        for i in range(len(self.population) // 2):
             if random.random() < self.recombineProbability:
                 o1, o2 = self.partiallyMappedCrossoverRecombination(1)
-                self.offspringPopulation = np.append(self.offspringPopulation, [o1])
-                self.offspringPopulation = np.append(self.offspringPopulation, [o2])
-        self.population = np.append(self.population, [self.offspringPopulation])
+                self.offspringPopulation = np.append(self.offspringPopulation, [o1, o2])
+        self.population = np.append(self.population, self.offspringPopulation)
 
+        l2 = list(self.islandPopulation)
+        bestIndividual2 = min(l2, key=lambda p: p.fitnessValue)
+        print("bestIndividual2 has fitness ", bestIndividual2.fitnessValue)
         self.offspringPopulation = []
-        for i in range(len(self.islandPopulation)//2):
+        for i in range(len(self.islandPopulation) // 2):
             if random.random() < self.recombineProbability:
                 o1, o2 = self.orderCrossoverOperator()
-                self.offspringPopulation = np.append(self.offspringPopulation, [o1])
-                self.offspringPopulation = np.append(self.offspringPopulation, [o2])
-        self.islandPopulation = np.append(self.islandPopulation, [self.offspringPopulation])
+                self.offspringPopulation = np.append(self.offspringPopulation, [o1, o2])
+        self.islandPopulation = np.append(self.islandPopulation, self.offspringPopulation)
 
     def parallelMutate(self):
         l1 = list(self.population)
         bestIndividual1 = min(l1, key=lambda p: p.fitnessValue)
+        print("bestIndividual1 has fitness ", bestIndividual1.fitnessValue)
         for i in self.population:
             if i == bestIndividual1:
                 continue
             if random.random() < self.mutationProbability * 5:
-                i.swapMutation()
+                i.swapMutationUpdateInfo()
 
         l2 = list(self.islandPopulation)
         bestIndividual2 = min(l2, key=lambda p: p.fitnessValue)
-        for i in self.islandPopulation:
-            if i == bestIndividual2:
+        print("bestIndividual2 has fitness ", bestIndividual2.fitnessValue)
+        for j in self.islandPopulation:
+            if j == bestIndividual2:
                 continue
             if random.random() < self.mutationProbability * 5:
-                i.swapMutation()
+                j.swapMutationUpdateInfo()
 
     def parallelEliminate(self):
         p = list(self.population)
@@ -580,7 +671,6 @@ class EvolutionaryAlgorithm:
 
         self.islandPopulation = np.append(island, islandLeft)
 
-
     def parallelLocalSearch(self):
         self.getTopKIndividuals(self.tournament_k)
 
@@ -595,11 +685,11 @@ class EvolutionaryAlgorithm:
             if i.fitnessValue < bestFitness:
                 bestFitness = i.fitnessValue
                 bestIndividual = i
-        for i in self.islandPopulation:
-            totalFitness += i.fitnessValue
-            if i.fitnessValue < bestFitness:
-                bestFitness = i.fitnessValue
-                bestIndividual = i
+        for j in self.islandPopulation:
+            totalFitness += j.fitnessValue
+            if j.fitnessValue < bestFitness:
+                bestFitness = j.fitnessValue
+                bestIndividual = j
         avgFitness = totalFitness / (self.islandSize + self.populationSize)
         return avgFitness, bestFitness, bestIndividual
 
@@ -631,8 +721,6 @@ class EvolutionaryAlgorithm:
             self.parallelEliminate()
             mean, bestFitness, bestIndividual = self.parallelGetBestFitness()
             return mean, bestFitness, bestIndividual.order
-
-
 
 
 # Modify the class name to match your student number.
@@ -673,7 +761,7 @@ class r0776947:
                 once = 1
                 mode = 1
                 algorithm.deleteDuplicateIndividuals()
-                algorithm.getPopulationSimilarityData()
+                # algorithm.getPopulationSimilarityData()
                 algorithm.getOneIsland()
 
             if mode == 1 and meanObjective < bestObjective * 1.15:
@@ -681,7 +769,7 @@ class r0776947:
             else:
                 convergentCount = 0
 
-            if convergentCount >= 15:
+            if convergentCount >= 100:
                 convergency = True
             counts = 0
             ts1 = time.time()
@@ -711,5 +799,4 @@ class r0776947:
 
 if __name__ == '__main__':
     r = r0776947()
-    r.optimize("tour100.csv")
-
+    r.optimize("tour1000.csv")
