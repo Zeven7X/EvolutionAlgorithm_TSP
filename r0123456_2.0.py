@@ -40,10 +40,10 @@ class TSP:
                 if self.distanceMatrix[i][j] == 0:
                     continue
                 elif self.distanceMatrix[i][j] == math.inf:
-                    possibilityMatrix[i][j] = np.exp(-1 * self.largestPath / 9)
+                    possibilityMatrix[i][j] = np.exp(-1 * self.largestPath / 50) / 10
                     # possibilityMatrix[i][j] = 1 / self.penalty
                 else:
-                    possibilityMatrix[i][j] = np.exp(-1 * self.distanceMatrix[i][j] / 9)
+                    possibilityMatrix[i][j] = np.exp(-1 * self.distanceMatrix[i][j] / 50)
                     # possibilityMatrix[i][j] = 1 / self.distanceMatrix[i][j]\
         print(possibilityMatrix)
         return possibilityMatrix
@@ -89,6 +89,7 @@ class Individual:
         self.order = newOrder.copy()
         if newFitness != -1:
             self.fitnessValue = newFitness
+            self.adjacency = self.getAdjacencyRepresentation()
         else:
             self.fitnessValue = self.fitness()
             self.adjacency = self.getAdjacencyRepresentation()
@@ -113,28 +114,19 @@ class Individual:
     def updateFitnessAndAdjacency(self, points):
         smallerPoint = min(points[0], points[1])
         biggerPoint = max(points[0], points[1])
-        if abs(points[0] - points[1]) == 1:
-            p1 = self.order[smallerPoint - 1]
-            p2 = self.order[smallerPoint]
-            p3 = self.order[smallerPoint + 1]
-            p4 = self.order[smallerPoint + 2] if smallerPoint + 2 != self.tsp.length else self.order[0]
-            d1 = self.getAdaptedDistance(self.tsp.distanceMatrix[p1][p2])
-            d2 = self.getAdaptedDistance(self.tsp.distanceMatrix[p2][p3])
-            d3 = self.getAdaptedDistance(self.tsp.distanceMatrix[p3][p4])
-            newD1 = self.getAdaptedDistance(self.tsp.distanceMatrix[p1][p3])
-            newD2 = self.getAdaptedDistance(self.tsp.distanceMatrix[p3][p2])
-            newD3 = self.getAdaptedDistance(self.tsp.distanceMatrix[p2][p4])
-            self.fitnessValue += newD1 + newD2 + newD3 - d1 - d2 - d3
-            if abs(self.fitnessValue) == math.inf:
-                print("Problem occurs")
-            self.adjacency[p1] = p3
-            self.adjacency[p3] = p2
-            self.adjacency[p2] = p4
-        elif abs(points[0] - points[1]) == self.tsp.length - 1:
-            p1 = self.order[self.tsp.length - 2]
-            p2 = self.order[self.tsp.length - 1]
-            p3 = self.order[0]
-            p4 = self.order[1]
+        if abs(points[0] - points[1]) == 1 or abs(points[0] - points[1]) == self.tsp.length - 1:
+            p1 = p2 = p3 = p4 = 0
+            if abs(points[0] - points[1]) == 1:
+                p1 = self.order[smallerPoint - 1]
+                p2 = self.order[smallerPoint]
+                p3 = self.order[smallerPoint + 1]
+                p4 = self.order[smallerPoint + 2] if smallerPoint + 2 != self.tsp.length else self.order[0]
+
+            else:
+                p1 = self.order[self.tsp.length - 2]
+                p2 = self.order[self.tsp.length - 1]
+                p3 = self.order[0]
+                p4 = self.order[1]
             d1 = self.getAdaptedDistance(self.tsp.distanceMatrix[p1][p2])
             d2 = self.getAdaptedDistance(self.tsp.distanceMatrix[p2][p3])
             d3 = self.getAdaptedDistance(self.tsp.distanceMatrix[p3][p4])
@@ -169,6 +161,51 @@ class Individual:
             self.adjacency[p5] = p3
             self.adjacency[p4] = p2
             self.adjacency[p2] = p6
+
+    def getMutateFitness(self, points, fitness, order):
+        smallerPoint = min(points[0], points[1])
+        biggerPoint = max(points[0], points[1])
+        if abs(points[0] - points[1]) == 1 or abs(points[0] - points[1]) == self.tsp.length - 1:
+            p1 = p2 = p3 = p4 = 0
+            if abs(points[0] - points[1]) == 1:
+                p1 = order[smallerPoint - 1]
+                p2 = order[smallerPoint]
+                p3 = order[smallerPoint + 1]
+                p4 = order[smallerPoint + 2] if smallerPoint + 2 != self.tsp.length else order[0]
+
+            else:
+                p1 = order[self.tsp.length - 2]
+                p2 = order[self.tsp.length - 1]
+                p3 = order[0]
+                p4 = order[1]
+            d1 = self.getAdaptedDistance(self.tsp.distanceMatrix[p1][p2])
+            d2 = self.getAdaptedDistance(self.tsp.distanceMatrix[p2][p3])
+            d3 = self.getAdaptedDistance(self.tsp.distanceMatrix[p3][p4])
+            newD1 = self.getAdaptedDistance(self.tsp.distanceMatrix[p1][p3])
+            newD2 = self.getAdaptedDistance(self.tsp.distanceMatrix[p3][p2])
+            newD3 = self.getAdaptedDistance(self.tsp.distanceMatrix[p2][p4])
+            fitness += newD1 + newD2 + newD3 - d1 - d2 - d3
+            if abs(fitness) == math.inf:
+                print("Problem occurs")
+        else:
+            p1 = order[smallerPoint - 1]
+            p2 = order[smallerPoint]
+            p3 = order[smallerPoint + 1]
+            p4 = order[biggerPoint - 1]
+            p5 = order[biggerPoint]
+            p6 = order[biggerPoint + 1] if biggerPoint + 1 != self.tsp.length else order[0]
+            d1 = self.getAdaptedDistance(self.tsp.distanceMatrix[p1][p2])
+            d2 = self.getAdaptedDistance(self.tsp.distanceMatrix[p2][p3])
+            d3 = self.getAdaptedDistance(self.tsp.distanceMatrix[p4][p5])
+            d4 = self.getAdaptedDistance(self.tsp.distanceMatrix[p5][p6])
+            newD1 = self.getAdaptedDistance(self.tsp.distanceMatrix[p1][p5])
+            newD2 = self.getAdaptedDistance(self.tsp.distanceMatrix[p5][p3])
+            newD3 = self.getAdaptedDistance(self.tsp.distanceMatrix[p4][p2])
+            newD4 = self.getAdaptedDistance(self.tsp.distanceMatrix[p2][p6])
+            fitness += newD1 + newD2 + newD3 + newD4 - d1 - d2 - d3 - d4
+            if abs(fitness) == math.inf:
+                print("Problem occurs")
+        return fitness
 
     def getAdaptedDistance(self, distance):
         return distance if distance != math.inf else self.maxValue * (self.penalty ** self.penaltyOrder)
@@ -450,12 +487,12 @@ class EvolutionaryAlgorithm:
         min1Index = min2Index = 0
         for i, p in enumerate(players):
             fitnessValue = self.sharedFitness(p, players)
-            if fitnessValue < min1:
+            if fitnessValue <= min1:
                 min2 = min1
                 min1 = fitnessValue
                 min2Index = min1Index
                 min1Index = i
-            elif fitnessValue < min2:
+            elif fitnessValue <= min2:
                 min2 = fitnessValue
                 min2Index = i
         p1 = players[min1Index]
@@ -464,34 +501,18 @@ class EvolutionaryAlgorithm:
         # print("Shared selection needs time: ", t2 - t1)
         return p1, p2
 
-    def mutateGenerateNewIndividual(self, individual: Individual):
+    def mutateGenerateNewIndividual(self, individual: Individual, point1=0, point2=0):
         order = individual.order.copy()
-        points = random.sample(range(0, self.tsp.getLength()), 2)
+        if point1 == 0 and point2 == 0:
+            points = random.sample(range(0, self.tsp.getLength()), 2)
+        else:
+            points = [point1, point2]
+        newFitness = individual.getMutateFitness(points, individual.fitnessValue, order)
         order[points[0]], order[points[1]] = order[points[1]], order[points[0]]
-        newIndividual = Individual(self.tsp, self.penalty, self.maxValue, order)
+        # newIndividual = Individual(self.tsp, self.penalty, self.maxValue, order)
         # print("new mutate individual fitness: ", newIndividual.fitnessValue)
         # self.population = np.append(self.population, [newIndividual])
-        return newIndividual
-
-    def getTopKIndividuals(self, topK=1):
-        p = list(self.population)
-        p.sort(key=lambda p: p.fitnessValue)
-        unchangedPop = p[topK:]
-        p = p[:topK]
-        for i in range(len(p)):
-            subGroup = []
-            # print("p[", i, "] original fitness: ", p[i].fitnessValue)
-            for j in range(self.tspLength // 10):
-                temp = self.mutateGenerateNewIndividual(p[i])
-                subGroup = np.append(subGroup, [temp])
-            subGroup = list(subGroup)
-            subGroup.sort(key=lambda sub: sub.fitnessValue)
-            if subGroup[0].fitnessValue < p[i].fitnessValue:
-                p[i].replaceOrder(subGroup[0].order, subGroup[0].fitnessValue)
-
-            if sum(p[i].order) != self.tspLength * (self.tspLength - 1) / 2:
-                print("Mutate Sum error")
-        self.population = np.append(p, unchangedPop)
+        return order, newFitness
 
     def getPopulationSimilarityData(self):
 
@@ -649,6 +670,27 @@ class EvolutionaryAlgorithm:
         i = i[:self.islandSize]
         self.islandPopulation = np.array(i)
 
+    def getTopKIndividuals(self, topK=1):
+        p = list(self.population)
+        p.sort(key=lambda individual: individual.fitnessValue)
+        unchangedPop = p[topK:]
+        p = p[:topK]
+        for i in range(len(p)):
+            subGroup = []
+            # print("p[", i, "] original fitness: ", p[i].fitnessValue)
+            for j in range(self.tspLength // 10):
+                order, newFitness = self.mutateGenerateNewIndividual(p[i])
+                # subGroup = np.append(subGroup, [[order, newFitness]])
+                subGroup.append([order, newFitness])
+            # subGroup = list(subGroup)
+            smallestOrder = min(subGroup, key=lambda p: p[1])
+            if smallestOrder[1] < p[i].fitnessValue:
+                p[i].replaceOrder(smallestOrder[0], smallestOrder[1])
+
+            if sum(p[i].order) != self.tspLength * (self.tspLength - 1) / 2:
+                print("Mutate Sum error")
+        self.population = np.append(p, unchangedPop)
+
     def islandLocalSearch(self, topK=5):
         island = list(self.islandPopulation)
         island.sort(key=lambda p: p.fitnessValue)
@@ -660,13 +702,18 @@ class EvolutionaryAlgorithm:
             index = individual.findLongestPath()
             numList = [k for k in range(0, self.tspLength)]
             localSearch = random.sample(numList, localSearchTime)
-            subGroup = [individual]
+            subGroup = []
             for i in range(localSearchTime):
-                order = individual.order.copy()
-                order[index], order[localSearch[i]] = order[localSearch[i]], order[index]
-                newIndividual = Individual(self.tsp, self.penalty, self.maxValue, order)
-                subGroup = np.append(subGroup, [newIndividual])
-            island[j] = min(subGroup, key=lambda p: p.fitnessValue)
+                order, newFitness = self.mutateGenerateNewIndividual(individual, index, localSearch[i])
+
+                subGroup.append([order, newFitness])
+                # order = individual.order.copy()
+                # order[index], order[localSearch[i]] = order[localSearch[i]], order[index]
+                # newIndividual = Individual(self.tsp, self.penalty, self.maxValue, order)
+                # subGroup = np.append(subGroup, [newIndividual])
+            smallestOrder = min(subGroup, key=lambda p: p[1])
+            if smallestOrder[1] < individual.fitnessValue:
+                individual.replaceOrder(smallestOrder[0], smallestOrder[1])
             j += 1
 
         self.islandPopulation = np.append(island, islandLeft)
@@ -750,7 +797,10 @@ class r0776947:
         once = 0
         convergency = False
         convergentCount = 0
-        while iterationTimes < 1000 and not convergency:
+        localConvergency = False
+        localConvergentCount = 0
+        lastTimeBestFitness = 0
+        while iterationTimes < 1500 and not convergency and not localConvergency:
             meanObjective, bestObjective, bestSolution = algorithm(iterationTimes, mode)
             print(str(iterationTimes))
             print(str("{:10.2f}".format(meanObjective)))
@@ -771,6 +821,13 @@ class r0776947:
 
             if convergentCount >= 100:
                 convergency = True
+
+            if mode == 1 and lastTimeBestFitness == bestObjective:
+                localConvergentCount += 1
+            else:
+                localConvergentCount = 0
+            if localConvergentCount >= 100:
+                localConvergency = True
             counts = 0
             ts1 = time.time()
             for i in range(-1, tsp.getLength() - 1, 1):
@@ -791,6 +848,7 @@ class r0776947:
             print("Time left: ", timeLeft)
             print("Report needs time: ", ts3 - ts2)
             iterationTimes += 1
+            lastTimeBestFitness = bestObjective
             if timeLeft < 0:
                 break
         # Your code here.
